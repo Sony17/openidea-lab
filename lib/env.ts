@@ -39,12 +39,12 @@ export const env = {
   metaApiUrl: (process.env.META_API_URL || 'https://api.meta.ai/v1').replace(/\/$/, ''),
   metaModel: process.env.META_MODEL || 'muse-spark-1.3',
   fireworksCodeModel:
-    process.env.FIREWORKS_CODE_MODEL || 'accounts/fireworks/models/qwen3-coder-480b-a35b-instruct',
+    process.env.FIREWORKS_CODE_MODEL || 'accounts/fireworks/models/deepseek-v4p1-flash',
   // Ranking 20 titles does not need the coder model; a small model is many times cheaper.
   fireworksRankModel:
-    process.env.FIREWORKS_RANK_MODEL || process.env.FIREWORKS_CODE_MODEL || 'accounts/fireworks/models/llama-v3p1-8b-instruct',
+    process.env.FIREWORKS_RANK_MODEL || process.env.FIREWORKS_CODE_MODEL || 'accounts/fireworks/models/nemotron-lightning-3p5-30b-a3b',
   fireworksVisionModel:
-    process.env.FIREWORKS_VISION_MODEL || 'accounts/fireworks/models/llama4-maverick-instruct-basic',
+    process.env.FIREWORKS_VISION_MODEL || 'accounts/fireworks/models/deepseek-v4p1-flash',
   basetenSam3ModelId: process.env.BASETEN_SAM3_MODEL_ID || '',
 };
 
