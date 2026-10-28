@@ -1,6 +1,12 @@
 # Truss config for SAM 3 on Baseten.
-# Deploy: `pip install truss && truss push baseten/sam3 --publish`
-# Then put the model id from the dashboard in BASETEN_SAM3_MODEL_ID.
+#
+# Deploy from the repo root:   truss push baseten/sam3 --publish
+# Then copy the model id from the Baseten dashboard into BASETEN_SAM3_MODEL_ID.
+#
+# Uses the Hugging Face transformers port of SAM 3 (Sam3Model / Sam3Processor),
+# which is the API Meta documents on the model card, so there is no git install.
+# The weights are gated: accept the licence at https://huggingface.co/facebook/sam3
+# and put a read token in the Baseten secret named hf_access_token.
 model_name: openidea-lab-sam3
 python_version: py311
 model_metadata:
@@ -10,16 +16,20 @@ model_metadata:
 requirements:
   - torch==2.5.1
   - torchvision==0.20.1
+  - transformers>=4.57.0
+  - accelerate>=1.0.0
   - pillow==11.0.0
   - numpy==1.26.4
-  - git+https://github.com/facebookresearch/sam3.git
 resources:
+  # SAM 3 (~850M params) fits an A10G (24 GB) comfortably; an H100 would cost
+  # several times more per minute for a demo that waits on a cold start anyway.
   accelerator: A10G
   use_gpu: true
   cpu: "4"
   memory: 16Gi
 secrets:
-  hf_access_token: null   # set in the Baseten dashboard; SAM 3 weights are gated on Hugging Face
+  hf_access_token: null   # value lives in the Baseten dashboard, never here
 runtime:
   predict_concurrency: 1
-# Scale to zero keeps the demo cheap; the client treats 503 as "warming".
+# Scale-to-zero (min replicas 0, max 1) is set in the dashboard after the first
+# deploy; the client treats a 503 during wake-up as "warming" and retries.
