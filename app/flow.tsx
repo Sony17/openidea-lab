@@ -6,11 +6,14 @@
  * Only the runner and the prompt differ, so this is one component.
  */
 
-import { useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import type { Plan, GeneratedFile } from '@/lib/muse';
 import type { Resource } from '@/lib/openidea';
 import type { RunResult } from '@/lib/runner/types';
+import { describeGraph, type Subgraph } from '@/lib/graph';
 import { saveToWorkspaceLink } from '@/lib/handoff';
+import { GraphView } from './graph-view';
 
 const MAX_FIXES = 3;
 
@@ -28,8 +31,23 @@ async function post<T>(url: string, body: unknown): Promise<{ ok: true; value: T
   return res.json();
 }
 
-export function FlowPage({ kind, title, placeholder, hint }: Props) {
+/** Open Resources links here with ?q=<title> ("Build this"); Suspense is what useSearchParams needs. */
+export function FlowPage(props: Props) {
+  return (
+    <Suspense fallback={null}>
+      <Flow {...props} />
+    </Suspense>
+  );
+}
+
+function Flow({ kind, title, placeholder, hint }: Props) {
+  const params = useSearchParams();
   const [input, setInput] = useState('');
+  const [graph, setGraph] = useState<Subgraph | null>(null);
+  useEffect(() => {
+    const q = params.get('q');
+    if (q) setInput(q);
+  }, [params]);
   const [step, setStep] = useState<Step>('idle');
   const [log, setLog] = useState<string[]>([]);
   const [context, setContext] = useState<Resource[]>([]);
@@ -41,17 +59,28 @@ export function FlowPage({ kind, title, placeholder, hint }: Props) {
   const say = (s: string) => setLog((l) => [...l, s]);
 
   async function start() {
-    setStep('searching'); setLog([]); setError(null); setPlan(null); setFiles([]); setRun(null);
+    setStep('searching'); setLog([]); setError(null); setPlan(null); setFiles([]); setRun(null); setGraph(null);
 
     const found = await post<Resource[]>('/api/lab/search', { query: input.slice(0, 500), keep: 6 });
     if (!found.ok) return fail(found.error, found.missing);
     setContext(found.value);
     say(`Found ${found.value.length} relevant open resources.`);
 
+    // The graph is a bonus: if it is down or empty, the flow continues without it.
+    let graphText = '';
+    if (found.value.length) {
+      const g = await post<Subgraph>('/api/lab/graph', { resources: found.value });
+      if (g.ok && g.value.edges.length) {
+        setGraph(g.value);
+        graphText = describeGraph(g.value);
+        say(`Knowledge graph: ${g.value.nodes.length - found.value.length} connected entities.`);
+      }
+    }
+
     setStep('drafting');
     const draft = await post<{ plan?: Plan; files: GeneratedFile[] }>(
       '/api/lab/plan',
-      kind === 'idea' ? { kind, idea: input, context: found.value } : { kind, text: input, context: found.value },
+      kind === 'idea' ? { kind, idea: input, context: found.value, graph: graphText } : { kind, text: input, context: found.value },
     );
     if (!draft.ok) return fail(draft.error, draft.missing);
     if (draft.value.plan) setPlan(draft.value.plan);
@@ -121,6 +150,12 @@ export function FlowPage({ kind, title, placeholder, hint }: Props) {
                 <li key={r.id}><a className="underline" href={r.url} target="_blank" rel="noreferrer">[{r.type}] {r.title}</a></li>
               ))}
             </ul>
+          </div>
+        )}
+        {graph && (
+          <div>
+            <h2 className="text-xs uppercase tracking-wide text-[var(--muted)]">What connects them</h2>
+            <div className="mt-2"><GraphView graph={graph} /></div>
           </div>
         )}
         {plan && (

@@ -51,12 +51,13 @@ async function chat(system: string, user: string, json = false): Promise<Result<
 }
 
 /** Idea flow: is it buildable, what exists, what is missing, how to build it. */
-export async function planIdea(idea: string, context: Resource[]): Promise<Result<Plan>> {
+export async function planIdea(idea: string, context: Resource[], graph = ''): Promise<Result<Plan>> {
   const system =
     'You assess whether an idea can be built today from open research, code, datasets and hardware. ' +
     'Answer as JSON: {"summary": string, "buildable": boolean, "exists": string[], "missing": string[], "steps": string[]}. ' +
-    'Be concrete. Name the resources you rely on by title.';
-  const user = `Idea:\n${idea}\n\nRelevant open resources:\n${describe(context)}`;
+    'Be concrete. Name the resources you rely on by title. When the knowledge graph names technologies the resources ' +
+    'share, treat those as the proven building blocks and say what is NOT covered by any of them.';
+  const user = `Idea:\n${idea}\n\nRelevant open resources:\n${describe(context)}${graph ? `\n\nKnowledge graph:\n${graph}` : ''}`;
   const r = await chat(system, user, true);
   return r.ok ? parseJson<Plan>(r.value) : r;
 }

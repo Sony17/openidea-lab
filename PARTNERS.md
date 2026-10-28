@@ -13,8 +13,9 @@ called, so a judge can verify it in one click.
 
 ## What is NOT part of the submission
 
-- **OpenIdea search** at openidea.world existed before the event. Lab calls its public API
-  through [`lib/openidea.ts`](lib/openidea.ts) and nothing more.
+- **OpenIdea search** and its **knowledge graph** at openidea.world existed before the event. Lab
+  reads them through [`lib/openidea.ts`](lib/openidea.ts) and [`lib/graph.ts`](lib/graph.ts) and
+  nothing more.
 - **App Studio** and **Workspaces** on openidea.world are pre-existing. Lab hands results
   to them by deep link ([`lib/handoff.ts`](lib/handoff.ts)); it does not contain them.
 

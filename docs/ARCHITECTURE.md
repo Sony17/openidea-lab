@@ -52,6 +52,17 @@ so the UI shows a warming state instead of a spinner.
 `lib/openidea.ts`. Each exports plain functions. Nothing else imports an SDK. Swapping a
 provider, or adding Modal later, is one file.
 
+**The knowledge graph grounds the plan.** The platform keeps a Neo4j graph of
+`(Resource)-[:MENTIONS]->(TECH | ORG | PERSON)`. After search, Lab asks for the one-hop
+neighbourhood of the results (`lib/graph.ts`), draws it (resources left, shared entities
+right, sized by how many results mention them) and hands Muse Spark a short paragraph:
+"technologies these resources share: …". The exists/missing answer then names real nodes.
+If the graph is down or knows none of the results, the flow continues without it.
+
+**Open Resources links in.** Every result on openidea.world/openresources can carry a
+"Build this" link to `lab.openidea.world/idea?q=<title>` or `/paper?q=…`; the flow pages
+read `?q=` and pre-fill. That is the Research → Build bridge the platform lacked.
+
 **Hand-off by deep link.** `lib/handoff.ts` builds the "Open in Studio" and "Save to
 Workspace" URLs and posts files to the platform's `/api/v1/studio/projects`. Lab never
 stores the user's project; the platform does.
@@ -63,8 +74,10 @@ app/                     Next.js App Router
   page.tsx               the three entry cards
   idea/  paper/  photo/  one route per flow
   api/lab/…              thin routes; all logic is in lib/
+  graph-view.tsx         SVG picture of the subgraph
 lib/
   openidea.ts            platform search client
+  graph.ts               knowledge-graph client + prompt helper
   muse.ts                Muse Spark client
   fireworks.ts           fix loop, ranking, structured extraction
   baseten-sam3.ts        SAM 3 client

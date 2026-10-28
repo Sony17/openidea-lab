@@ -11,7 +11,7 @@ const Resource = z.object({
 });
 
 const Body = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('idea'), idea: z.string().min(5).max(5000), context: z.array(Resource) }),
+  z.object({ kind: z.literal('idea'), idea: z.string().min(5).max(5000), context: z.array(Resource), graph: z.string().max(4000).optional() }),
   z.object({ kind: z.literal('paper'), text: z.string().min(50), context: z.array(Resource) }),
 ]);
 
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   const body = parsed.data;
 
   if (body.kind === 'idea') {
-    const plan = await planIdea(body.idea, body.context);
+    const plan = await planIdea(body.idea, body.context, body.graph);
     if (!plan.ok) return NextResponse.json(plan, { status: plan.missing ? 424 : 502 });
     const files = await draftPrototype(body.idea, plan.value);
     if (!files.ok) return NextResponse.json(files, { status: 502 });
