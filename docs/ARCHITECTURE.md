@@ -90,6 +90,24 @@ demo/                    recorded inputs and outputs for each flow
 docs/                    this file and friends
 ```
 
+## Usage tracking
+
+Every provider call is recorded, and each API route returns what its request spent next to its
+result. The flow pages add it up and show a "Usage this run" table.
+
+- **Meta and Fireworks** report tokens in the `usage` field of the chat-completions response;
+  `lib/muse.ts` and `lib/fireworks.ts` pass it to `recordTokens`, labelled by purpose (plan,
+  draft, notebook, parts, rank, fix, label).
+- **Baseten** bills SAM 3 by GPU time, so there are no tokens. `lib/baseten-sam3.ts` records how
+  many seconds each call held the endpoint and whether it hit a cold start.
+- **Per-request, not global.** `withUsage` in `lib/usage.ts` uses AsyncLocalStorage, so
+  concurrent requests never mix. Server logs also get one `[usage] …` line per call.
+- **Cost is opt-in.** Set the `*_PRICE_*` variables in `.env.local` (see `.env.example`) and the
+  panel shows dollars; leave them empty and it shows tokens and seconds only. Prices are not
+  hard-coded because they change.
+- Usage is per run and lives in the page; nothing is stored. For monthly totals use each
+  provider's own dashboard, which is the billing source of truth.
+
 ## Running it yourself
 
 Every provider key in `.env.example` is optional. With none set, the UI loads and each flow

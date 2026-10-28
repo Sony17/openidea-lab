@@ -13,6 +13,7 @@
 
 import { env, keyFor, notConfigured, type Result } from './env';
 import type { Resource } from './openidea';
+import { recordTokens, type ApiUsage } from './usage';
 
 const META_API = `${env.metaApiUrl}/chat/completions`;
 
@@ -29,7 +30,7 @@ export interface GeneratedFile {
   content: string;
 }
 
-async function chat(system: string, user: string, json = false): Promise<Result<string>> {
+async function chat(label: string, system: string, user: string, json = false): Promise<Result<string>> {
   const key = keyFor('meta');
   if (!key) return notConfigured('meta');
 
@@ -46,7 +47,8 @@ async function chat(system: string, user: string, json = false): Promise<Result<
     }),
   });
   if (!res.ok) return { ok: false, error: `Muse Spark failed: ${res.status} ${await res.text()}` };
-  const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+  const body = (await res.json()) as { choices?: { message?: { content?: string } }[]; usage?: ApiUsage };
+  recordTokens('meta', env.metaModel, label, body.usage);
   const content = body.choices?.[0]?.message?.content;
   return content ? { ok: true, value: content } : { ok: false, error: 'Muse Spark returned no content' };
 }
@@ -59,7 +61,7 @@ export async function planIdea(idea: string, context: Resource[], graph = ''): P
     'Be concrete. Name the resources you rely on by title. When the knowledge graph names technologies the resources ' +
     'share, treat those as the proven building blocks and say what is NOT covered by any of them.';
   const user = `Idea:\n${idea}\n\nRelevant open resources:\n${describe(context)}${graph ? `\n\nKnowledge graph:\n${graph}` : ''}`;
-  const r = await chat(system, user, true);
+  const r = await chat('plan', system, user, true);
   return r.ok ? parseJson<Plan>(r.value) : r;
 }
 
@@ -70,7 +72,7 @@ export async function draftPrototype(idea: string, plan: Plan): Promise<Result<G
     'Return JSON: {"files": [{"path": string, "content": string}]}. Include package.json, index.html, src/main.tsx, src/App.tsx. ' +
     'No external packages beyond react and react-dom. Keep it under 200 lines.';
   const user = `Idea:\n${idea}\n\nPlan:\n${plan.steps.join('\n')}`;
-  const r = await chat(system, user, true);
+  const r = await chat('draft', system, user, true);
   return r.ok ? parseJson<{ files: GeneratedFile[] }>(r.value).then(unwrapFiles) : r;
 }
 
@@ -81,7 +83,7 @@ export async function draftNotebook(paperText: string, context: Resource[]): Pro
     '(numpy, pandas, matplotlib, scikit-learn available; no torch, no network). Pick ONE figure or table that can be ' +
     'reproduced on a small synthetic or bundled sample, and say which. Return JSON: {"files": [{"path": "reproduce.py", "content": string}, {"path": "README.md", "content": string}]}.';
   const user = `Paper text (truncated):\n${paperText.slice(0, 60_000)}\n\nRelated open code and data:\n${describe(context)}`;
-  const r = await chat(system, user, true);
+  const r = await chat('notebook', system, user, true);
   return r.ok ? parseJson<{ files: GeneratedFile[] }>(r.value).then(unwrapFiles) : r;
 }
 
@@ -91,7 +93,7 @@ export async function enrichParts(parts: string[], context: Resource[]): Promise
     'Given electronic or mechanical parts identified in a photo and open hardware search results, write a parts list in Markdown: ' +
     'part, likely model, datasheet link if present in the results, rough price, and what it does in this assembly.';
   const user = `Parts:\n${parts.join('\n')}\n\nSearch results:\n${describe(context)}`;
-  return chat(system, user);
+  return chat('parts', system, user);
 }
 
 function describe(resources: Resource[]): string {

@@ -9,6 +9,7 @@
  */
 
 import { env, keyFor, notConfigured, type Result } from './env';
+import { recordGpu } from './usage';
 
 export interface Segment {
   index: number;
@@ -25,14 +26,21 @@ export async function segment(imageDataUrl: string, prompt?: string): Promise<Re
   const key = keyFor('baseten');
   if (!key || !env.basetenSam3ModelId) return notConfigured('baseten');
 
+  const started = performance.now();
   const res = await fetch(`https://model-${env.basetenSam3ModelId}.api.baseten.co/production/predict`, {
     method: 'POST',
     headers: { Authorization: `Api-Key ${key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ image: imageDataUrl, prompt: prompt ?? 'every distinct component' }),
   });
 
+  const seconds = (performance.now() - started) / 1000;
+
   // Baseten answers 503 while a scale-to-zero replica is starting.
-  if (res.status === 503) return { ok: true, value: { warming: true } };
+  if (res.status === 503) {
+    recordGpu(env.basetenSam3ModelId, 'segment', seconds, true);
+    return { ok: true, value: { warming: true } };
+  }
+  recordGpu(env.basetenSam3ModelId, 'segment', seconds, false);
   if (!res.ok) return { ok: false, error: `SAM 3 failed: ${res.status} ${await res.text()}` };
 
   const body = (await res.json()) as { segments?: Segment[] };

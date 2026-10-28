@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { draftNotebook, draftPrototype, planIdea } from '@/lib/muse';
+import { withUsage } from '@/lib/usage';
 
 const Resource = z.object({
   id: z.string(),
@@ -21,15 +22,18 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'Bad request' }, { status: 400 });
   const body = parsed.data;
 
-  if (body.kind === 'idea') {
-    const plan = await planIdea(body.idea, body.context, body.graph);
-    if (!plan.ok) return NextResponse.json(plan, { status: plan.missing ? 424 : 502 });
-    const files = await draftPrototype(body.idea, plan.value);
-    if (!files.ok) return NextResponse.json(files, { status: 502 });
-    return NextResponse.json({ ok: true, value: { plan: plan.value, files: files.value } });
-  }
+  const { result, usage } = await withUsage(async () => {
+    if (body.kind === 'idea') {
+      const plan = await planIdea(body.idea, body.context, body.graph);
+      if (!plan.ok) return { out: plan, status: plan.missing ? 424 : 502 };
+      const files = await draftPrototype(body.idea, plan.value);
+      if (!files.ok) return { out: files, status: 502 };
+      return { out: { ok: true as const, value: { plan: plan.value, files: files.value } }, status: 200 };
+    }
+    const files = await draftNotebook(body.text, body.context);
+    if (!files.ok) return { out: files, status: files.missing ? 424 : 502 };
+    return { out: { ok: true as const, value: { files: files.value } }, status: 200 };
+  });
 
-  const files = await draftNotebook(body.text, body.context);
-  if (!files.ok) return NextResponse.json(files, { status: files.missing ? 424 : 502 });
-  return NextResponse.json({ ok: true, value: { files: files.value } });
+  return NextResponse.json({ ...result.out, usage }, { status: result.status });
 }

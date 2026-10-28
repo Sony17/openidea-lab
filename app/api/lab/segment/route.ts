@@ -4,6 +4,7 @@ import { segment } from '@/lib/baseten-sam3';
 import { labelParts } from '@/lib/fireworks';
 import { enrichParts } from '@/lib/muse';
 import { search } from '@/lib/openidea';
+import { withUsage } from '@/lib/usage';
 
 const Body = z.object({
   /** data:image/...;base64,... of the whole photo. */
@@ -22,20 +23,24 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'Bad request' }, { status: 400 });
   const { image, crops } = parsed.data;
 
-  if (!crops) {
-    const r = await segment(image);
-    return NextResponse.json(r, { status: r.ok ? 200 : r.missing ? 424 : 502 });
-  }
+  const { result, usage } = await withUsage(async () => {
+    if (!crops) {
+      const r = await segment(image);
+      return { out: r, status: r.ok ? 200 : r.missing ? 424 : 502 };
+    }
 
-  const labelled = await labelParts(crops);
-  if (!labelled.ok) return NextResponse.json(labelled, { status: labelled.missing ? 424 : 502 });
-  const names = labelled.value.map((p) => p.name);
+    const labelled = await labelParts(crops);
+    if (!labelled.ok) return { out: labelled, status: labelled.missing ? 424 : 502 };
+    const names = labelled.value.map((p) => p.name);
 
-  const found = await search(names.slice(0, 5).join(' '), { types: ['hardware', 'code'], limit: 10 });
-  const context = found.ok ? found.value : [];
+    const found = await search(names.slice(0, 5).join(' '), { types: ['hardware', 'code'], limit: 10 });
+    const context = found.ok ? found.value : [];
 
-  const list = await enrichParts(names, context);
-  if (!list.ok) return NextResponse.json(list, { status: list.missing ? 424 : 502 });
+    const list = await enrichParts(names, context);
+    if (!list.ok) return { out: list, status: list.missing ? 424 : 502 };
 
-  return NextResponse.json({ ok: true, value: { parts: labelled.value, markdown: list.value, context } });
+    return { out: { ok: true as const, value: { parts: labelled.value, markdown: list.value, context } }, status: 200 };
+  });
+
+  return NextResponse.json({ ...result.out, usage }, { status: result.status });
 }

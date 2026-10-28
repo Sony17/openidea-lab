@@ -12,12 +12,13 @@
 import { env, keyFor, notConfigured, type Result } from './env';
 import type { GeneratedFile } from './muse';
 import type { Resource } from './openidea';
+import { recordTokens, type ApiUsage } from './usage';
 
 const FIREWORKS_API = 'https://api.fireworks.ai/inference/v1/chat/completions';
 
 type Content = string | { type: 'text'; text: string }[] | { type: 'image_url'; image_url: { url: string } }[];
 
-async function chat(model: string, messages: { role: string; content: Content }[], json = false): Promise<Result<string>> {
+async function chat(label: string, model: string, messages: { role: string; content: Content }[], json = false): Promise<Result<string>> {
   const key = keyFor('fireworks');
   if (!key) return notConfigured('fireworks');
 
@@ -27,7 +28,8 @@ async function chat(model: string, messages: { role: string; content: Content }[
     body: JSON.stringify({ model, messages, temperature: 0.2, ...(json ? { response_format: { type: 'json_object' } } : {}) }),
   });
   if (!res.ok) return { ok: false, error: `Fireworks failed: ${res.status} ${await res.text()}` };
-  const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+  const body = (await res.json()) as { choices?: { message?: { content?: string } }[]; usage?: ApiUsage };
+  recordTokens('fireworks', model, label, body.usage);
   const content = body.choices?.[0]?.message?.content;
   return content ? { ok: true, value: content } : { ok: false, error: 'Fireworks returned no content' };
 }
@@ -37,6 +39,7 @@ export async function rank(input: string, results: Resource[], keep = 6): Promis
   if (results.length <= keep) return { ok: true, value: results };
   const listing = results.map((r, i) => `${i}. [${r.type}] ${r.title}: ${r.description?.slice(0, 160) ?? ''}`).join('\n');
   const r = await chat(
+    'rank',
     env.fireworksCodeModel,
     [
       { role: 'system', content: `Pick the ${keep} results most useful for building the input. Return JSON {"keep": number[]} with indices in rank order.` },
@@ -56,6 +59,7 @@ export async function rank(input: string, results: Resource[], keep = 6): Promis
 /** Patch the files so the reported error goes away. Returns the full file list. */
 export async function fix(files: GeneratedFile[], error: string): Promise<Result<GeneratedFile[]>> {
   const r = await chat(
+    'fix',
     env.fireworksCodeModel,
     [
       {
@@ -85,6 +89,7 @@ export interface LabelledPart {
 /** Name each segmented part from a crop (data URL). */
 export async function labelParts(crops: string[]): Promise<Result<LabelledPart[]>> {
   const r = await chat(
+    'label',
     env.fireworksVisionModel,
     [
       {

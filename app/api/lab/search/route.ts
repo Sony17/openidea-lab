@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { search } from '@/lib/openidea';
 import { rank } from '@/lib/fireworks';
+import { withUsage } from '@/lib/usage';
 
 const Body = z.object({
   query: z.string().min(2).max(2000),
@@ -19,6 +20,6 @@ export async function POST(req: Request) {
   if (!found.ok) return NextResponse.json(found, { status: found.missing ? 424 : 502 });
 
   // Ranking is a nicety: if Fireworks is not configured, return the raw order.
-  const ranked = await rank(query, found.value, keep ?? 6);
-  return NextResponse.json({ ok: true, value: ranked.ok ? ranked.value : found.value.slice(0, keep ?? 6) });
+  const { result: ranked, usage } = await withUsage(() => rank(query, found.value, keep ?? 6));
+  return NextResponse.json({ ok: true, value: ranked.ok ? ranked.value : found.value.slice(0, keep ?? 6), usage });
 }

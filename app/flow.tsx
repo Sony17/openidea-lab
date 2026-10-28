@@ -12,8 +12,10 @@ import type { Plan, GeneratedFile } from '@/lib/muse';
 import type { Resource } from '@/lib/openidea';
 import type { RunResult } from '@/lib/runner/types';
 import { describeGraph, type Subgraph } from '@/lib/graph';
+import type { UsageEntry } from '@/lib/usage-types';
 import { saveToWorkspaceLink } from '@/lib/handoff';
 import { GraphView } from './graph-view';
+import { UsagePanel } from './usage-panel';
 
 const MAX_FIXES = 3;
 
@@ -26,7 +28,7 @@ interface Props {
   hint: string;
 }
 
-async function post<T>(url: string, body: unknown): Promise<{ ok: true; value: T } | { ok: false; error: string; missing?: string }> {
+async function post<T>(url: string, body: unknown): Promise<{ ok: true; value: T; usage?: UsageEntry[] } | { ok: false; error: string; missing?: string; usage?: UsageEntry[] }> {
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   // A route that throws returns an empty or HTML body; say so instead of a JSON parse error.
   const text = await res.text();
@@ -51,6 +53,7 @@ function Flow({ kind, title, placeholder, hint }: Props) {
   const params = useSearchParams();
   const [input, setInput] = useState('');
   const [graph, setGraph] = useState<Subgraph | null>(null);
+  const [usage, setUsage] = useState<UsageEntry[]>([]);
   useEffect(() => {
     const q = params.get('q');
     if (q) setInput(q);
@@ -65,10 +68,17 @@ function Flow({ kind, title, placeholder, hint }: Props) {
 
   const say = (s: string) => setLog((l) => [...l, s]);
 
-  async function start() {
-    setStep('searching'); setLog([]); setError(null); setPlan(null); setFiles([]); setRun(null); setGraph(null);
+  /** post() that also collects the provider usage the route reports. */
+  async function call<T>(url: string, body: unknown) {
+    const r = await post<T>(url, body);
+    if (r.usage?.length) setUsage((u) => [...u, ...(r.usage ?? [])]);
+    return r;
+  }
 
-    const found = await post<Resource[]>('/api/lab/search', { query: input.slice(0, 500), keep: 6 });
+  async function start() {
+    setStep('searching'); setLog([]); setError(null); setPlan(null); setFiles([]); setRun(null); setGraph(null); setUsage([]);
+
+    const found = await call<Resource[]>('/api/lab/search', { query: input.slice(0, 500), keep: 6 });
     if (!found.ok) return fail(found.error, found.missing);
     setContext(found.value);
     say(`Found ${found.value.length} relevant open resources.`);
@@ -76,7 +86,7 @@ function Flow({ kind, title, placeholder, hint }: Props) {
     // The graph is a bonus: if it is down or empty, the flow continues without it.
     let graphText = '';
     if (found.value.length) {
-      const g = await post<Subgraph>('/api/lab/graph', { resources: found.value });
+      const g = await call<Subgraph>('/api/lab/graph', { resources: found.value });
       if (g.ok && g.value.edges.length) {
         setGraph(g.value);
         graphText = describeGraph(g.value);
@@ -85,7 +95,7 @@ function Flow({ kind, title, placeholder, hint }: Props) {
     }
 
     setStep('drafting');
-    const draft = await post<{ plan?: Plan; files: GeneratedFile[] }>(
+    const draft = await call<{ plan?: Plan; files: GeneratedFile[] }>(
       '/api/lab/plan',
       kind === 'idea' ? { kind, idea: input, context: found.value, graph: graphText } : { kind, text: input, context: found.value },
     );
@@ -110,7 +120,7 @@ function Flow({ kind, title, placeholder, hint }: Props) {
 
       setStep('fixing');
       say(`Error: ${result.error.split('\n')[0]}. Asking Fireworks to fix…`);
-      const fixed = await post<GeneratedFile[]>('/api/lab/fix', { files: current, error: result.error });
+      const fixed = await call<GeneratedFile[]>('/api/lab/fix', { files: current, error: result.error });
       if (!fixed.ok) return fail(fixed.error, fixed.missing);
       current = fixed.value;
       setFiles(current);
@@ -177,6 +187,7 @@ function Flow({ kind, title, placeholder, hint }: Props) {
       <section className="grid content-start gap-3">
         <h2 className="text-xs uppercase tracking-wide text-[var(--muted)]">Log</h2>
         <pre className="max-h-64 overflow-auto rounded-md border border-[var(--line)] bg-black/40 p-3 text-xs">{log.join('\n') || '—'}</pre>
+        <UsagePanel entries={usage} />
         {run?.figures?.map((src, i) => (
           // eslint-disable-next-line @next/next/no-img-element
           <img key={i} src={src} alt={`Figure ${i + 1}`} className="rounded-md border border-[var(--line)]" />

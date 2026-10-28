@@ -10,6 +10,8 @@ import { useRef, useState } from 'react';
 import type { Segment, SegmentResult } from '@/lib/baseten-sam3';
 import type { LabelledPart } from '@/lib/fireworks';
 import { saveToWorkspaceLink } from '@/lib/handoff';
+import type { UsageEntry } from '@/lib/usage-types';
+import { UsagePanel } from '../usage-panel';
 
 type Step = 'idle' | 'segmenting' | 'warming' | 'labelling' | 'done' | 'failed';
 
@@ -20,6 +22,7 @@ export function PhotoFlow() {
   const [parts, setParts] = useState<LabelledPart[]>([]);
   const [markdown, setMarkdown] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [usage, setUsage] = useState<UsageEntry[]>([]);
   const canvas = useRef<HTMLCanvasElement>(null);
 
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -33,6 +36,7 @@ export function PhotoFlow() {
   async function analyse() {
     if (!image) return;
     setError(null);
+    setUsage([]);
     setStep('segmenting');
 
     // Retry while the Baseten replica warms up (scale-to-zero cold start).
@@ -40,6 +44,7 @@ export function PhotoFlow() {
     for (let i = 0; i < 12 && !seg; i++) {
       const res = await fetch('/api/lab/segment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image }) });
       const body = await res.json();
+      addUsage(body.usage);
       if (!body.ok) return fail(body.error, body.missing);
       if (body.value.warming) { setStep('warming'); await new Promise((r) => setTimeout(r, 8000)); continue; }
       seg = body.value;
@@ -51,6 +56,7 @@ export function PhotoFlow() {
     setStep('labelling');
     const res = await fetch('/api/lab/segment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image, crops }) });
     const body = await res.json();
+    addUsage(body.usage);
     if (!body.ok) return fail(body.error, body.missing);
     setParts(body.value.parts);
     setMarkdown(body.value.markdown);
@@ -78,6 +84,10 @@ export function PhotoFlow() {
       crops.push(cc.toDataURL('image/jpeg', 0.85));
     });
     return crops;
+  }
+
+  function addUsage(entries?: UsageEntry[]) {
+    if (entries?.length) setUsage((u) => [...u, ...entries]);
   }
 
   function fail(msg: string, missing?: string) {
@@ -109,6 +119,7 @@ export function PhotoFlow() {
         <canvas ref={canvas} className={segments.length ? 'max-w-full rounded-md border border-[var(--line)]' : 'hidden'} />
       </section>
       <section className="grid content-start gap-3">
+        <UsagePanel entries={usage} />
         {parts.length > 0 && (
           <ol className="grid gap-1 text-sm">
             {parts.map((p) => (
