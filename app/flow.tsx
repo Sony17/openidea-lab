@@ -115,7 +115,7 @@ function Flow({ kind, title, placeholder, hint }: Props) {
       say(attempt === 0 ? `Running in ${runner.name}…` : `Re-running after fix ${attempt}…`);
       const result = await runner.run(current, (line) => say(line.trimEnd()));
       setRun(result);
-      if (result.ok) { say('It runs.'); setStep('done'); return; }
+      if (result.ok) { say(result.previewUrl ? 'It runs. Live preview below.' : 'It runs.'); setStep('done'); return; }
       if (attempt === MAX_FIXES) break;
 
       setStep('fixing');
@@ -188,6 +188,17 @@ function Flow({ kind, title, placeholder, hint }: Props) {
         <h2 className="text-xs uppercase tracking-wide text-[var(--muted)]">Log</h2>
         <pre className="max-h-64 overflow-auto rounded-md border border-[var(--line)] bg-black/40 p-3 text-xs">{log.join('\n') || '—'}</pre>
         <UsagePanel entries={usage} />
+        {run?.previewUrl && (
+          <div>
+            <h2 className="text-xs uppercase tracking-wide text-[var(--muted)]">Live preview</h2>
+            <iframe
+              id="prototype-preview"
+              title="The running prototype"
+              src={run.previewUrl}
+              className="mt-2 h-[480px] w-full rounded-md border border-[var(--line)] bg-white"
+            />
+          </div>
+        )}
         {run?.figures?.map((src, i) => (
           // eslint-disable-next-line @next/next/no-img-element
           <img key={i} src={src} alt={`Figure ${i + 1}`} className="rounded-md border border-[var(--line)]" />
