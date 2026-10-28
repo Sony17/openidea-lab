@@ -1,0 +1,52 @@
+/**
+ * Provider configuration, read once.
+ *
+ * Every provider is optional. A flow that needs a missing key reports
+ * `{ ok: false, missing: 'META_API_KEY' }` instead of throwing, so the UI can
+ * say exactly which key to set. This is what lets someone run the app with
+ * nothing but a search key and still work on the UI.
+ */
+
+export type Provider = 'openidea' | 'meta' | 'fireworks' | 'baseten';
+
+const KEYS: Record<Provider, string> = {
+  openidea: 'OPENIDEA_API_KEY',
+  meta: 'META_API_KEY',
+  fireworks: 'FIREWORKS_API_KEY',
+  baseten: 'BASETEN_API_KEY',
+};
+
+export function keyFor(provider: Provider): string | null {
+  return process.env[KEYS[provider]] || null;
+}
+
+export function missingKey(provider: Provider): string {
+  return KEYS[provider];
+}
+
+export function configured(): Record<Provider, boolean> {
+  return {
+    openidea: !!keyFor('openidea'),
+    meta: !!keyFor('meta'),
+    fireworks: !!keyFor('fireworks'),
+    baseten: !!keyFor('baseten') && !!process.env.BASETEN_SAM3_MODEL_ID,
+  };
+}
+
+export const env = {
+  labUrl: process.env.NEXT_PUBLIC_LAB_URL || 'http://localhost:3000',
+  openideaUrl: process.env.OPENIDEA_API_URL || 'https://openidea.world/api/v1',
+  metaModel: process.env.META_MODEL || 'muse-spark',
+  fireworksCodeModel:
+    process.env.FIREWORKS_CODE_MODEL || 'accounts/fireworks/models/qwen3-coder-480b-a35b-instruct',
+  fireworksVisionModel:
+    process.env.FIREWORKS_VISION_MODEL || 'accounts/fireworks/models/llama4-maverick-instruct-basic',
+  basetenSam3ModelId: process.env.BASETEN_SAM3_MODEL_ID || '',
+};
+
+/** The shape every provider call returns, so callers never need try/catch for config. */
+export type Result<T> = { ok: true; value: T } | { ok: false; error: string; missing?: string };
+
+export function notConfigured<T>(provider: Provider): Result<T> {
+  return { ok: false, error: `${provider} is not configured`, missing: missingKey(provider) };
+}

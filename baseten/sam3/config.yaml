@@ -1,0 +1,25 @@
+# Truss config for SAM 3 on Baseten.
+# Deploy: `pip install truss && truss push baseten/sam3 --publish`
+# Then put the model id from the dashboard in BASETEN_SAM3_MODEL_ID.
+model_name: openidea-lab-sam3
+python_version: py311
+model_metadata:
+  example_model_input:
+    image: "data:image/jpeg;base64,..."
+    prompt: "every distinct component"
+requirements:
+  - torch==2.5.1
+  - torchvision==0.20.1
+  - pillow==11.0.0
+  - numpy==1.26.4
+  - git+https://github.com/facebookresearch/sam3.git
+resources:
+  accelerator: A10G
+  use_gpu: true
+  cpu: "4"
+  memory: 16Gi
+secrets:
+  hf_access_token: null   # set in the Baseten dashboard; SAM 3 weights are gated on Hugging Face
+runtime:
+  predict_concurrency: 1
+# Scale to zero keeps the demo cheap; the client treats 503 as "warming".
