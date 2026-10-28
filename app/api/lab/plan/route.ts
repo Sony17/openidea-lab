@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { draftNotebook, draftPrototype, planIdea } from '@/lib/muse';
+import { overBudget } from '@/lib/budget';
+import { safe } from '@/lib/route';
 import { withUsage } from '@/lib/usage';
+
+export const maxDuration = 60;
 
 const Resource = z.object({
   id: z.string(),
@@ -17,10 +21,13 @@ const Body = z.discriminatedUnion('kind', [
 ]);
 
 /** Muse Spark: plan an idea and draft its prototype, or draft a paper reproduction. */
-export async function POST(req: Request) {
+export const POST = safe(async (req: Request) => {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'Bad request' }, { status: 400 });
   const body = parsed.data;
+
+  const blocked = await overBudget('meta');
+  if (blocked) return NextResponse.json({ ok: false, error: blocked, budget: true, usage: [] }, { status: 429 });
 
   const { result, usage } = await withUsage(async () => {
     if (body.kind === 'idea') {
@@ -36,4 +43,4 @@ export async function POST(req: Request) {
   });
 
   return NextResponse.json({ ...result.out, usage }, { status: result.status });
-}
+});

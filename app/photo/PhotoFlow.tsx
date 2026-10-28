@@ -10,6 +10,7 @@ import { useRef, useState } from 'react';
 import type { Segment, SegmentResult } from '@/lib/baseten-sam3';
 import type { LabelledPart } from '@/lib/fireworks';
 import { saveToWorkspaceLink } from '@/lib/handoff';
+import { saveRun } from '@/lib/history';
 import type { UsageEntry } from '@/lib/usage-types';
 import { UsagePanel } from '../usage-panel';
 
@@ -60,6 +61,7 @@ export function PhotoFlow() {
     if (!body.ok) return fail(body.error, body.missing);
     setParts(body.value.parts);
     setMarkdown(body.value.markdown);
+    saveRun({ kind: 'photo', title: 'Parts list', input: 'Photo of hardware', parts: body.value.parts, markdown: body.value.markdown, context: body.value.context });
     setStep('done');
   }
 

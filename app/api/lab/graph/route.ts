@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { neighbourhood } from '@/lib/graph';
+import { safe } from '@/lib/route';
 
 const Body = z.object({
   resources: z
@@ -10,9 +11,9 @@ const Body = z.object({
 });
 
 /** Knowledge-graph neighbourhood of the search results: what connects them. */
-export async function POST(req: Request) {
+export const POST = safe(async (req: Request) => {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'Bad request' }, { status: 400 });
   const r = await neighbourhood(parsed.data.resources.map((x) => ({ ...x, type: x.type as never })));
   return NextResponse.json(r, { status: r.ok ? 200 : r.missing ? 424 : 502 });
-}
+});

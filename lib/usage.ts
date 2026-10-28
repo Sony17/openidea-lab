@@ -6,6 +6,8 @@
  * collected next to its result. AsyncLocalStorage keeps concurrent requests
  * apart without threading a collector through every function signature.
  *
+ * Each request's entries are also added to the running totals in budget.ts.
+ *
  * Prices come from the environment, per million tokens for Meta and Fireworks
  * and per minute for Baseten:
  *   META_PRICE_IN_PER_M, META_PRICE_OUT_PER_M,
@@ -15,6 +17,7 @@
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { persistSpend } from './budget';
 import type { TokenProvider, UsageEntry } from './usage-types';
 
 const store = new AsyncLocalStorage<UsageEntry[]>();
@@ -22,6 +25,8 @@ const store = new AsyncLocalStorage<UsageEntry[]>();
 export async function withUsage<T>(fn: () => Promise<T>): Promise<{ result: T; usage: UsageEntry[] }> {
   const entries: UsageEntry[] = [];
   const result = await store.run(entries, fn);
+  // Persist before the route responds: a serverless function may be frozen right after.
+  await persistSpend(entries).catch((e) => console.warn('[budget] could not save spend', e));
   return { result, usage: entries };
 }
 

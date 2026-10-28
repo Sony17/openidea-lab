@@ -21,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/idea" className="hover:text-[var(--fg)]">Idea</Link>
               <Link href="/paper" className="hover:text-[var(--fg)]">Paper</Link>
               <Link href="/photo" className="hover:text-[var(--fg)]">Photo</Link>
+              <Link href="/history" className="hover:text-[var(--fg)]">History</Link>
               <a href="https://openidea.world" className="hover:text-[var(--fg)]">openidea.world ↗</a>
             </nav>
           </div>

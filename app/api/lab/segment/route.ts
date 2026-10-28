@@ -4,7 +4,12 @@ import { segment } from '@/lib/baseten-sam3';
 import { labelParts } from '@/lib/fireworks';
 import { enrichParts } from '@/lib/muse';
 import { search } from '@/lib/openidea';
+import { overBudget } from '@/lib/budget';
+import { safe } from '@/lib/route';
 import { withUsage } from '@/lib/usage';
+
+// A cold SAM 3 replica can take a while to answer; the client retries on "warming".
+export const maxDuration = 60;
 
 const Body = z.object({
   /** data:image/...;base64,... of the whole photo. */
@@ -18,10 +23,13 @@ const Body = z.object({
  * `warming`). Second call, with crops: Fireworks labels each part, OpenIdea
  * finds datasheets and listings, Muse Spark writes the parts list.
  */
-export async function POST(req: Request) {
+export const POST = safe(async (req: Request) => {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'Bad request' }, { status: 400 });
   const { image, crops } = parsed.data;
+
+  const blocked = crops ? (await overBudget('fireworks')) ?? (await overBudget('meta')) : await overBudget('baseten');
+  if (blocked) return NextResponse.json({ ok: false, error: blocked, budget: true, usage: [] }, { status: 429 });
 
   const { result, usage } = await withUsage(async () => {
     if (!crops) {
@@ -43,4 +51,4 @@ export async function POST(req: Request) {
   });
 
   return NextResponse.json({ ...result.out, usage }, { status: result.status });
-}
+});

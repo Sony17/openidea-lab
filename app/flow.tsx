@@ -14,6 +14,7 @@ import type { RunResult } from '@/lib/runner/types';
 import { describeGraph, type Subgraph } from '@/lib/graph';
 import type { UsageEntry } from '@/lib/usage-types';
 import { saveToWorkspaceLink } from '@/lib/handoff';
+import { saveRun } from '@/lib/history';
 import { GraphView } from './graph-view';
 import { UsagePanel } from './usage-panel';
 
@@ -100,7 +101,8 @@ function Flow({ kind, title, placeholder, hint }: Props) {
       kind === 'idea' ? { kind, idea: input, context: found.value, graph: graphText } : { kind, text: input, context: found.value },
     );
     if (!draft.ok) return fail(draft.error, draft.missing);
-    if (draft.value.plan) setPlan(draft.value.plan);
+    const planLocal = draft.value.plan;
+    if (planLocal) setPlan(planLocal);
     let current = draft.value.files;
     setFiles(current);
     say(`Muse Spark drafted ${current.length} file(s).`);
@@ -115,7 +117,16 @@ function Flow({ kind, title, placeholder, hint }: Props) {
       say(attempt === 0 ? `Running in ${runner.name}…` : `Re-running after fix ${attempt}…`);
       const result = await runner.run(current, (line) => say(line.trimEnd()));
       setRun(result);
-      if (result.ok) { say(result.previewUrl ? 'It runs. Live preview below.' : 'It runs.'); setStep('done'); return; }
+      if (result.ok) {
+        say(result.previewUrl ? 'It runs. Live preview below.' : 'It runs.');
+        const saved = saveRun({
+          kind, input, plan: planLocal, files: current, figures: result.figures, context: found.value,
+          title: input.replace(/\s+/g, ' ').trim().slice(0, 70),
+        });
+        say(saved ? 'Saved to History.' : 'Could not save to History (browser storage is full or blocked).');
+        setStep('done');
+        return;
+      }
       if (attempt === MAX_FIXES) break;
 
       setStep('fixing');
@@ -219,6 +230,7 @@ function Flow({ kind, title, placeholder, hint }: Props) {
             <a className="rounded-md border border-[var(--accent)] px-3 py-1.5 text-sm" href={saveToWorkspaceLink(input.slice(0, 80), markdown).url} target="_blank" rel="noreferrer">
               Save to Workspace ↗
             </a>
+            <a className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm" href="/history">History</a>
             {kind === 'idea' && (
               <span className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--muted)]" title="Needs your openidea.world API key; coming next">
                 Open in Studio
