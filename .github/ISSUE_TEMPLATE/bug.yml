@@ -1,0 +1,25 @@
+name: Bug report
+description: Something in Lab did not do what it says it does
+labels: [bug]
+body:
+  - type: dropdown
+    id: flow
+    attributes:
+      label: Which flow
+      options: [Idea, Paper, Photo, Hand-off to openidea.world, Other]
+    validations: { required: true }
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Include the input you gave (paper link, idea text, or a description of the photo) and the error shown.
+    validations: { required: true }
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+  - type: input
+    id: url
+    attributes:
+      label: Where
+      placeholder: https://lab.openidea.world/... or "local"

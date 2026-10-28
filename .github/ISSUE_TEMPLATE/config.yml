@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security issue
+    url: https://github.com/Sony17/openidea-lab/blob/main/SECURITY.md
+    about: Please email instead of opening an issue.
+  - name: Platform (search, Studio, Workspaces) issue
+    url: https://github.com/Sony17/Ecosyz/issues
+    about: Those live in the Ecosyz repository.
