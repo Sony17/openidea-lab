@@ -9,7 +9,7 @@ called, so a judge can verify it in one click.
 | **Meta** | Muse Spark (Meta Model API) | Reads the paper or idea, plans the reproduction, writes the first version of the code | [`lib/muse.ts`](lib/muse.ts) |
 | **Meta** | SAM 3 | Outlines every part in a hardware photo | [`baseten/sam3/`](baseten/sam3/) (deployment), [`lib/baseten-sam3.ts`](lib/baseten-sam3.ts) (client) |
 | **Baseten** | GPU model hosting | Serves SAM 3 behind an HTTPS endpoint | [`baseten/sam3/`](baseten/sam3/) |
-| **Fireworks** | Fast open-model inference | The fix loop (patches errors the sandbox reports), ranks search results before Muse Spark sees them, turns masks and labels into a parts-list JSON | [`lib/fireworks.ts`](lib/fireworks.ts) |
+| **Fireworks** | Fast open-model inference | The fix loop (patches errors the sandbox reports), ranks search results before Muse Spark sees them, names the parts SAM 3 found, and judges whether a paper reproduction's output supports the paper's claim | [`lib/fireworks.ts`](lib/fireworks.ts) |
 
 ## What is NOT part of the submission
 

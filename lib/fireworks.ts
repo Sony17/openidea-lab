@@ -37,10 +37,11 @@ async function chat(label: string, model: string, messages: { role: string; cont
 /** Keep the results that matter for this input. Returns ids in rank order. */
 export async function rank(input: string, results: Resource[], keep = 6): Promise<Result<Resource[]>> {
   if (results.length <= keep) return { ok: true, value: results };
-  const listing = results.map((r, i) => `${i}. [${r.type}] ${r.title}: ${r.description?.slice(0, 160) ?? ''}`).join('\n');
+  // Title plus one line each: picking 6 of 20 does not need the descriptions in full.
+  const listing = results.map((r, i) => `${i}. [${r.type}] ${r.title}: ${r.description?.slice(0, 120) ?? ''}`).join('\n');
   const r = await chat(
     'rank',
-    env.fireworksCodeModel,
+    env.fireworksRankModel,
     [
       { role: 'system', content: `Pick the ${keep} results most useful for building the input. Return JSON {"keep": number[]} with indices in rank order.` },
       { role: 'user', content: `Input:\n${input}\n\nResults:\n${listing}` },
@@ -111,5 +112,42 @@ export async function labelParts(crops: string[]): Promise<Result<LabelledPart[]
     return { ok: true, value: parts };
   } catch {
     return { ok: false, error: 'Labeller returned invalid JSON' };
+  }
+}
+
+export interface Verdict {
+  /** matches: the output shows the claimed effect; partial: the shape is there but weak or noisy; no: it does not. */
+  verdict: 'matches' | 'partial' | 'no';
+  reason: string;
+}
+
+/**
+ * Compare what the reproduction printed with what the paper claims. A build
+ * that "runs" is not a reproduction; this is the line under the figure that
+ * says whether the result is the paper's result, so the demo never overclaims.
+ */
+export async function verdict(claim: string, readme: string, output: string): Promise<Result<Verdict>> {
+  const r = await chat(
+    'verdict',
+    env.fireworksCodeModel,
+    [
+      {
+        role: 'system',
+        content:
+          'You judge whether a small reproduction supports a paper\'s claim. You see the claim, the reproduction\'s own README and its printed output. ' +
+          'Be strict about the SHAPE of the result (where peaks and minima fall, directions of change) and lenient about exact numbers, since the data is synthetic. ' +
+          'Return JSON {"verdict": "matches" | "partial" | "no", "reason": string}. The reason is one or two plain sentences a non-expert can follow, naming the number or line that decided it.',
+      },
+      { role: 'user', content: `Claim (from the paper):\n${claim}\n\nREADME of the reproduction:\n${readme}\n\nPrinted output:\n${output}` },
+    ],
+    true,
+  );
+  if (!r.ok) return r;
+  try {
+    const v = JSON.parse(r.value) as Verdict;
+    if (!['matches', 'partial', 'no'].includes(v.verdict)) throw new Error('bad verdict');
+    return { ok: true, value: { verdict: v.verdict, reason: String(v.reason ?? '') } };
+  } catch {
+    return { ok: false, error: 'Verdict returned invalid JSON' };
   }
 }

@@ -40,6 +40,9 @@ export const env = {
   metaModel: process.env.META_MODEL || 'muse-spark-1.3',
   fireworksCodeModel:
     process.env.FIREWORKS_CODE_MODEL || 'accounts/fireworks/models/qwen3-coder-480b-a35b-instruct',
+  // Ranking 20 titles does not need the coder model; a small model is many times cheaper.
+  fireworksRankModel:
+    process.env.FIREWORKS_RANK_MODEL || process.env.FIREWORKS_CODE_MODEL || 'accounts/fireworks/models/llama-v3p1-8b-instruct',
   fireworksVisionModel:
     process.env.FIREWORKS_VISION_MODEL || 'accounts/fireworks/models/llama4-maverick-instruct-basic',
   basetenSam3ModelId: process.env.BASETEN_SAM3_MODEL_ID || '',

@@ -9,18 +9,20 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import type { Plan, GeneratedFile } from '@/lib/muse';
+import type { Verdict } from '@/lib/fireworks';
 import type { Resource } from '@/lib/openidea';
 import type { RunResult } from '@/lib/runner/types';
 import { describeGraph, type Subgraph } from '@/lib/graph';
 import type { UsageEntry } from '@/lib/usage-types';
-import { saveToWorkspaceLink } from '@/lib/handoff';
+import { saveToWorkspaceLink, type Handoff } from '@/lib/handoff';
 import { saveRun } from '@/lib/history';
 import { GraphView } from './graph-view';
+import { StudioButton } from './studio-button';
 import { UsagePanel } from './usage-panel';
 
 const MAX_FIXES = 3;
 
-type Step = 'idle' | 'searching' | 'drafting' | 'running' | 'fixing' | 'done' | 'failed';
+type Step = 'idle' | 'searching' | 'drafting' | 'running' | 'fixing' | 'judging' | 'done' | 'failed';
 
 interface Props {
   kind: 'idea' | 'paper';
@@ -66,6 +68,8 @@ function Flow({ kind, title, placeholder, hint }: Props) {
   const [files, setFiles] = useState<GeneratedFile[]>([]);
   const [run, setRun] = useState<RunResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [verdict, setVerdict] = useState<Verdict | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
 
   const say = (s: string) => setLog((l) => [...l, s]);
 
@@ -77,7 +81,7 @@ function Flow({ kind, title, placeholder, hint }: Props) {
   }
 
   async function start() {
-    setStep('searching'); setLog([]); setError(null); setPlan(null); setFiles([]); setRun(null); setGraph(null); setUsage([]);
+    setStep('searching'); setLog([]); setError(null); setPlan(null); setFiles([]); setRun(null); setGraph(null); setUsage([]); setVerdict(null); setSavedId(null);
 
     const found = await call<Resource[]>('/api/lab/search', { query: input.slice(0, 500), keep: 6 });
     if (!found.ok) return fail(found.error, found.missing);
@@ -119,10 +123,28 @@ function Flow({ kind, title, placeholder, hint }: Props) {
       setRun(result);
       if (result.ok) {
         say(result.previewUrl ? 'It runs. Live preview below.' : 'It runs.');
+
+        // Running is not reproducing: for a paper, ask whether the output supports the claim.
+        let v: Verdict | undefined;
+        if (kind === 'paper') {
+          setStep('judging');
+          say('Checking the result against the paper\u2019s claim…');
+          const readme = current.find((f) => /readme/i.test(f.path))?.content ?? '';
+          const j = await call<Verdict>('/api/lab/verdict', { claim: input.slice(0, 6000), readme: readme.slice(0, 6000), output: result.output.slice(-6000) });
+          if (j.ok) {
+            v = j.value;
+            setVerdict(v);
+            say(`Verdict: ${v.verdict}. ${v.reason}`);
+          } else {
+            say(`Could not get a verdict: ${j.error}`);
+          }
+        }
+
         const saved = saveRun({
-          kind, input, plan: planLocal, files: current, figures: result.figures, context: found.value,
+          kind, input, plan: planLocal, files: current, figures: result.figures, context: found.value, verdict: v,
           title: input.replace(/\s+/g, ' ').trim().slice(0, 70),
         });
+        setSavedId(saved?.id ?? null);
         say(saved ? 'Saved to History.' : 'Could not save to History (browser storage is full or blocked).');
         setStep('done');
         return;
@@ -142,6 +164,7 @@ function Flow({ kind, title, placeholder, hint }: Props) {
   function fail(msg: string, missing?: string) {
     setError(missing ? `${msg}. Set ${missing} in .env.local.` : msg);
     setStep('failed');
+    if (/needs a passcode/i.test(msg)) window.location.href = `/enter?next=${encodeURIComponent(window.location.pathname)}`;
   }
 
   const busy = step !== 'idle' && step !== 'done' && step !== 'failed';
@@ -214,6 +237,18 @@ function Flow({ kind, title, placeholder, hint }: Props) {
           // eslint-disable-next-line @next/next/no-img-element
           <img key={i} src={src} alt={`Figure ${i + 1}`} className="rounded-md border border-[var(--line)]" />
         ))}
+        {verdict && (
+          <div
+            id="verdict"
+            className={`rounded-md border p-3 text-sm ${
+              verdict.verdict === 'matches' ? 'border-[var(--accent)]/60 bg-[var(--accent)]/10' : verdict.verdict === 'partial' ? 'border-amber-300/50 bg-amber-300/10' : 'border-red-400/50 bg-red-400/10'
+            }`}
+          >
+            <b>{verdict.verdict === 'matches' ? 'Matches the paper\u2019s claim.' : verdict.verdict === 'partial' ? 'Partly matches the claim.' : 'Does not match the claim.'}</b>{' '}
+            {verdict.reason}
+            <span className="mt-1 block text-xs text-[var(--muted)]">Judged from the printed output on synthetic data. Not a peer review.</span>
+          </div>
+        )}
         {files.length > 0 && (
           <details>
             <summary className="cursor-pointer text-sm">{files.length} file(s)</summary>
@@ -232,9 +267,14 @@ function Flow({ kind, title, placeholder, hint }: Props) {
             </a>
             <a className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm" href="/history">History</a>
             {kind === 'idea' && (
-              <span className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--muted)]" title="Needs your openidea.world API key; coming next">
-                Open in Studio
-              </span>
+              <StudioButton
+                title={input.replace(/\s+/g, ' ').trim().slice(0, 70) || 'Lab prototype'}
+                idea={input}
+                summary={plan?.summary}
+                files={files}
+                runId={savedId}
+                onOpened={(h: Handoff) => say(`Opened in App Studio: ${h.url}`)}
+              />
             )}
           </div>
         )}

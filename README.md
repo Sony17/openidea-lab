@@ -16,7 +16,11 @@ OpenIdea Lab turns an idea, a research paper, or a photo of hardware into a work
 | 📄 A research paper | A notebook that reproduces the paper's key result |
 | 📷 A photo of hardware | Every part outlined, with a parts list, prices and datasheets |
 
-Each result can be sent to the Open Idea platform: ideas open in **App Studio**, papers and parts lists save to a **Workspace**.
+Each result can be sent to the Open Idea platform: ideas open in **App Studio**, papers and parts lists save to a **Workspace**. Finished runs are kept in **History** (in your browser) and can be downloaded as Markdown.
+
+Paper reproductions come with a **verdict**: Fireworks reads the printed output and says whether it supports the paper's claim, so "it runs" is never mistaken for "it reproduces".
+
+Every run shows what it spent per provider. A **credit dashboard** at `/usage` tracks spend against the credit you were given and pauses new runs before it runs out. A shared **passcode** and a per-visitor **rate limit** protect a public deployment.
 
 ## How it works
 
@@ -61,7 +65,7 @@ cp .env.example .env.local
 pnpm dev
 ```
 
-Every provider key is optional. With none set, the UI loads and each flow tells you which key it needs.
+Every provider key is optional. With none set, the UI loads and each flow tells you which key it needs. `.env.example` documents every variable, including prices and credit for the dashboard, and `LAB_PASSCODE` for a shared deployment.
 
 ## Contributing
 

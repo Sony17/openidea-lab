@@ -79,9 +79,18 @@ export async function draftPrototype(idea: string, plan: Plan): Promise<Result<G
 /** Paper flow: a notebook that reproduces one key result on small data. */
 export async function draftNotebook(paperText: string, context: Resource[]): Promise<Result<GeneratedFile[]>> {
   const system =
-    'You reproduce the key result of a research paper as a single Python script that runs in Pyodide ' +
-    '(numpy, pandas, matplotlib, scikit-learn available; no torch, no network). Pick ONE figure or table that can be ' +
-    'reproduced on a small synthetic or bundled sample, and say which. Return JSON: {"files": [{"path": "reproduce.py", "content": string}, {"path": "README.md", "content": string}]}.';
+    'You reproduce the key result of a research paper as ONE Python script that runs in Pyodide ' +
+    '(numpy, pandas, matplotlib, scikit-learn available; no torch, no network, no files to download). ' +
+    'Pick ONE figure or table that can be reproduced on a small synthetic or bundled sample, and say which in the README. ' +
+    'Rules that keep the result honest: ' +
+    '(1) Fix the random seed. ' +
+    '(2) Average over at least 20 trials and plot the mean with a shaded standard error. ' +
+    '(3) For any least-squares or linear fit, use the minimum-norm solution via numpy.linalg.pinv or lstsq with rcond=None; never invert a Gram matrix directly, it blows up when parameters exceed samples. ' +
+    '(4) Before plotting, CHECK the result against the claim in code (for example: is the peak within one grid step of the predicted point? does the curve fall after it?) and print a line starting with "CHECK:" saying pass or fail and the numbers. ' +
+    '(5) If the check fails, adjust the experiment (grid, sample size, noise) once within the script and re-run before plotting. ' +
+    '(6) Print the table of values the figure is drawn from, then call plt.show(). ' +
+    'Return JSON: {"files": [{"path": "reproduce.py", "content": string}, {"path": "README.md", "content": string}]}. ' +
+    'The README states the claim being tested in one sentence, the synthetic setup, and what "CHECK: pass" means.';
   const user = `Paper text (truncated):\n${paperText.slice(0, 60_000)}\n\nRelated open code and data:\n${describe(context)}`;
   const r = await chat('notebook', system, user, true);
   return r.ok ? parseJson<{ files: GeneratedFile[] }>(r.value).then(unwrapFiles) : r;

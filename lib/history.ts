@@ -7,7 +7,7 @@
  * Keeps the newest MAX runs and sheds figures first when the browser quota is hit.
  */
 
-import type { LabelledPart } from './fireworks';
+import type { LabelledPart, Verdict } from './fireworks';
 import type { Plan, GeneratedFile } from './muse';
 import type { Resource } from './openidea';
 
@@ -24,6 +24,10 @@ export interface SavedRun {
   files?: GeneratedFile[];
   /** PNG data URLs from a paper run. */
   figures?: string[];
+  /** Paper run: does the output support the paper's claim? */
+  verdict?: Verdict;
+  /** Idea run: the Studio project this was sent to, if any. */
+  studioUrl?: string;
   /** Photo flow: the written parts list and the named parts. */
   markdown?: string;
   parts?: LabelledPart[];
@@ -84,6 +88,8 @@ export function runToMarkdown(run: SavedRun): string {
     if (run.plan.missing.length) out.push('', '**What is missing**', ...run.plan.missing.map((x) => `- ${x}`));
     if (run.plan.steps.length) out.push('', '**Steps**', ...run.plan.steps.map((x, i) => `${i + 1}. ${x}`));
   }
+  if (run.verdict) out.push('', '## Verdict', '', `**${run.verdict.verdict}** — ${run.verdict.reason}`);
+  if (run.studioUrl) out.push('', `Opened in App Studio: ${run.studioUrl}`);
   if (run.markdown) out.push('', '## Parts list', '', run.markdown);
   if (run.context?.length) out.push('', '## Related open resources', '', ...run.context.map((r) => `- [${r.type}] [${r.title}](${r.url})`));
   for (const f of run.files ?? []) out.push('', `## ${f.path}`, '', '```', f.content, '```');

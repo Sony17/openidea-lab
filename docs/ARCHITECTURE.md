@@ -90,6 +90,33 @@ demo/                    recorded inputs and outputs for each flow
 docs/                    this file and friends
 ```
 
+## Access
+
+A public deployment needs two things static code does not give: a way to keep strangers from spending
+the credit, and a cap on how fast anyone can. `lib/access.ts` provides both.
+
+- **Passcode.** With `LAB_PASSCODE` set, pages redirect to `/enter` (middleware, Edge runtime) and
+  `/api/lab/*` answers 401 until the visitor's cookie holds the passcode's SHA-256. One shared secret
+  for judges and friends; not accounts.
+- **Rate limit.** `LAB_RATE_LIMIT_PER_HOUR` calls per visitor IP (default 40, about eight builds),
+  counted in the same store as the budget so it holds across serverless instances with Redis.
+- Both live in `safe()` (`lib/route.ts`), so a new route is protected by wrapping it.
+
+## Hand-off to Studio
+
+`POST /api/lab/studio` creates an App Studio project on openidea.world with the visitor's own
+platform API key, forwarded once and never stored. The platform's `POST /api/v1/studio/projects`
+takes a title and description today, so the description carries the idea, Lab's plan and the file
+list; the files are sent as well for when the platform accepts them. The key is kept in the visitor's
+browser (localStorage) so it is asked for once.
+
+## Verdict on paper runs
+
+Running is not reproducing. After a paper script runs, `/api/lab/verdict` gives Fireworks the paper's
+claim, the script's README and its printed output, and gets back `matches | partial | no` with a one-
+sentence reason, shown under the figure. The notebook prompt also asks the script to check its own
+result and print a `CHECK:` line, so the verdict has a number to point at.
+
 ## Usage tracking
 
 Every provider call is recorded, and each API route returns what its request spent next to its
