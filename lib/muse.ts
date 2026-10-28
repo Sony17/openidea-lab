@@ -6,14 +6,15 @@
  * code. It is called once or twice per flow. The many small fix-up calls go to
  * Fireworks (see fireworks.ts), which is faster and cheaper.
  *
- * The API is OpenAI-compatible chat completions. Check the model id in
- * META_MODEL against https://ai.meta.com before a demo; versions have moved.
+ * The API is OpenAI-compatible chat completions at https://api.meta.ai/v1
+ * (docs: https://dev.meta.ai/docs/protocols/chat-completions). The model id
+ * moves with releases (1.1 → 1.3 during 2026); META_MODEL overrides the default.
  */
 
 import { env, keyFor, notConfigured, type Result } from './env';
 import type { Resource } from './openidea';
 
-const META_API = 'https://api.meta.com/v1/chat/completions';
+const META_API = `${env.metaApiUrl}/chat/completions`;
 
 export interface Plan {
   summary: string;

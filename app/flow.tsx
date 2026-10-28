@@ -28,7 +28,14 @@ interface Props {
 
 async function post<T>(url: string, body: unknown): Promise<{ ok: true; value: T } | { ok: false; error: string; missing?: string }> {
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  return res.json();
+  // A route that throws returns an empty or HTML body; say so instead of a JSON parse error.
+  const text = await res.text();
+  if (!text) return { ok: false, error: `${url} returned an empty response (HTTP ${res.status}). See the pnpm dev terminal.` };
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { ok: false, error: `${url} returned non-JSON (HTTP ${res.status}): ${text.slice(0, 200)}` };
+  }
 }
 
 /** Open Resources links here with ?q=<title> ("Build this"); Suspense is what useSearchParams needs. */

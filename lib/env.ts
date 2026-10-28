@@ -36,7 +36,8 @@ export function configured(): Record<Provider, boolean> {
 export const env = {
   labUrl: process.env.NEXT_PUBLIC_LAB_URL || 'http://localhost:3000',
   openideaUrl: process.env.OPENIDEA_API_URL || 'https://openidea.world/api/v1',
-  metaModel: process.env.META_MODEL || 'muse-spark',
+  metaApiUrl: (process.env.META_API_URL || 'https://api.meta.ai/v1').replace(/\/$/, ''),
+  metaModel: process.env.META_MODEL || 'muse-spark-1.3',
   fireworksCodeModel:
     process.env.FIREWORKS_CODE_MODEL || 'accounts/fireworks/models/qwen3-coder-480b-a35b-instruct',
   fireworksVisionModel:
