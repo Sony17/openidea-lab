@@ -191,7 +191,17 @@ function Flow({ kind, title, placeholder, hint }: Props) {
         >
           {busy ? step + '…' : 'Build it'}
         </button>
-        {error && <p className="text-sm text-red-300">{error}</p>}
+        {error && (
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-sm text-red-300">{error}</p>
+            {/* Busy or slow upstreams are usually gone a minute later; one click, not a retyped idea. */}
+            {step === 'failed' && input.trim().length >= 5 && (
+              <button onClick={start} className="rounded-md border border-[var(--accent)] px-3 py-1 text-sm">
+                Try again
+              </button>
+            )}
+          </div>
+        )}
 
         {context.length > 0 && (
           <div>
